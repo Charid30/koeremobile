@@ -153,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 32),
               const Center(
-                child: Text('© 2025 KOERE — Tous droits réservés',
+                child: Text('© 2026 SOFARY. Tous droits réservés',
                     style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
               ),
             ]),

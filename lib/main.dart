@@ -21,7 +21,7 @@ class KoereApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KOERE',
+      title: 'SOFARY',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: navigatorKey,

@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('KOERE'),
+        title: const Text('SOFARY'),
         actions: [
           if (user != null)
             Padding(
