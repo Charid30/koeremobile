@@ -23,6 +23,10 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    // Ferme la session côté serveur (sans bloquer si le réseau est coupé)
+    try {
+      await _api.post('/auth/logout').timeout(const Duration(seconds: 5));
+    } catch (_) {}
     await _storage.deleteAll();
   }
 

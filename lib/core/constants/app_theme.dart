@@ -19,8 +19,8 @@ class AppTheme {
   static const Color success = Color(0xFF16A34A);
 
   // Neutres
-  static const Color surface = Color(0xFFF9FAFB);
-  static const Color border = Color(0xFFE5E7EB);
+  static const Color surface = Color(0xFFF6F5FA); // fond légèrement violet
+  static const Color border = Color(0xFFE8E5EF);
   static const Color textPrimary = Color(0xFF111827);
   static const Color textSecondary = Color(0xFF6B7280);
 
@@ -134,15 +134,15 @@ class AppTheme {
           surfaceTintColor: Colors.transparent,
           indicatorColor: primaryLight,
           elevation: 0,
-          height: 68,
+          height: 66,
           iconTheme: WidgetStateProperty.resolveWith(
             (s) => IconThemeData(color: s.contains(WidgetState.selected) ? primary : textSecondary),
           ),
           labelTextStyle: WidgetStateProperty.resolveWith(
             (s) => TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
               fontFamily: 'Inter',
-              fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
+              fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
               color: s.contains(WidgetState.selected) ? primary : textSecondary,
             ),
           ),

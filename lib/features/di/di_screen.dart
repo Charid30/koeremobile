@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../core/services/api_service.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_theme.dart';
+import '../../core/constants/libelles.dart';
+import '../../core/constants/permissions.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/auth_provider.dart';
+import '../../core/utils/format.dart';
 import '../../core/widgets/error_view.dart';
+import '../../core/widgets/ui.dart';
 import 'di_create_screen.dart';
 import 'di_detail_screen.dart';
 
+/// Signalements de panne (demandes d'intervention).
 class DiScreen extends StatefulWidget {
   const DiScreen({super.key});
 
@@ -14,113 +21,205 @@ class DiScreen extends StatefulWidget {
 
 class _DiScreenState extends State<DiScreen> {
   final _api = ApiService();
-  List<dynamic> _list = [];
+  List<Map<String, dynamic>> _list = [];
   bool _loading = true;
   Object? _error;
+  String? _statut;
+  String _recherche = '';
 
   @override
-  void initState() { super.initState(); _charger(); }
+  void initState() {
+    super.initState();
+    _charger();
+  }
 
   Future<void> _charger() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() => _error = null);
     try {
       final res = await _api.get('/demandes-intervention', params: {'limit': '100'});
-      setState(() { _list = res.data['data'] as List; _loading = false; });
+      if (!mounted) return;
+      setState(() {
+        _list = (res.data['data'] as List).cast<Map<String, dynamic>>();
+        _loading = false;
+      });
     } catch (e) {
-      setState(() { _error = e; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e;
+          _loading = false;
+        });
     }
+  }
+
+  int _nb(String s) => _list.where((d) => d['statut'] == s).length;
+
+  List<Map<String, dynamic>> get _filtres {
+    final q = _recherche.trim().toLowerCase();
+    return _list.where((d) {
+      if (_statut != null && d['statut'] != _statut) return false;
+      if (q.isEmpty) return true;
+      return [
+        d['numeroDI'],
+        d['description'],
+        d['localisation'],
+        d['vehicule']?['immatriculation'],
+        d['vehicule']?['marque'],
+      ].any((x) => (x ?? '').toString().toLowerCase().contains(q));
+    }).toList();
+  }
+
+  Future<void> _ouvrir(Widget ecran) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => ecran));
+    _charger();
   }
 
   @override
   Widget build(BuildContext context) {
+    final role = context.watch<AuthProvider>().user?['role'] as String?;
+    final liste = _filtres;
+    final enAttente = _nb('EN_ATTENTE');
+
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DiCreateScreen())).then((_) => _charger()),
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
+      floatingActionButton: autorise(role, 'di.creer')
+          ? FloatingActionButton.extended(
+              heroTag: 'fab_di',
+              onPressed: () => _ouvrir(const DiCreateScreen()),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Signaler', style: TextStyle(fontWeight: FontWeight.w600)),
+            )
+          : null,
+      body: Column(
+        children: [
+          EnTeteOnglet(
+            titre: 'Signalements',
+            sousTitre: _loading
+                ? 'Chargement…'
+                : enAttente > 0
+                ? '$enAttente en attente de prise en charge'
+                : 'Aucun signalement en attente',
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: ChampRecherche(
+              indice: 'Véhicule, description, lieu…',
+              onChanged: (t) => setState(() => _recherche = t),
+            ),
+          ),
+          BarreFiltres(
+            actif: _statut,
+            onChanged: (s) => setState(() => _statut = s),
+            filtres: [
+              Filtre(null, 'Tous', _list.length),
+              for (final e in diStatuts.entries) Filtre(e.key, e.value.texte, _nb(e.key)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _loading
+                ? const ChargementListe()
+                : _error != null
+                ? ErrorView(error: _error!, onRetry: _charger)
+                : RefreshIndicator(
+                    onRefresh: _charger,
+                    child: liste.isEmpty
+                        ? ListeVide(
+                            child: _list.isEmpty
+                                ? EtatVide(
+                                    icone: Icons.campaign_rounded,
+                                    titre: 'Aucun signalement',
+                                    message:
+                                        'Une panne, un bruit, un voyant allumé ?\nSignalez-le en quelques secondes.',
+                                    action: autorise(role, 'di.creer') ? 'Signaler une panne' : null,
+                                    onAction: () => _ouvrir(const DiCreateScreen()),
+                                  )
+                                : const EtatVide(
+                                    icone: Icons.search_off_rounded,
+                                    titre: 'Aucun résultat',
+                                    message: 'Essayez une autre recherche ou un autre filtre.',
+                                  ),
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                            itemCount: liste.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
+                            itemBuilder: (_, i) => _carte(liste[i]),
+                          ),
+                  ),
+          ),
+        ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? ErrorView(error: _error!, onRetry: _charger)
-              : RefreshIndicator(
-                  onRefresh: _charger,
-                  child: _list.isEmpty
-                      ? _emptyView()
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _list.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
-                          itemBuilder: (_, i) {
-                            final d = _list[i] as Map<String, dynamic>;
-                            final statut = d['statut'] as String? ?? '';
-                            return Card(
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DiDetailScreen(di: d))).then((_) => _charger()),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Row(children: [
-                                      Expanded(child: Text(
-                                        d['vehicule'] != null ? '${d['vehicule']['immatriculation']}' : 'Véhicule inconnu',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
-                                      )),
-                                      _statutBadge(statut),
-                                    ]),
-                                    if (d['vehicule'] != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${d['vehicule']['marque']} ${d['vehicule']['modele']}',
-                                        style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w500),
-                                      ),
-                                    ],
-                                    if (d['description'] != null) ...[
-                                      const SizedBox(height: 6),
-                                      Text(d['description'], style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    ],
-                                    const SizedBox(height: 8),
-                                    Row(children: [
-                                      const Icon(Icons.location_on_outlined, size: 13, color: AppTheme.textSecondary),
-                                      const SizedBox(width: 4),
-                                      Expanded(child: Text(d['localisation'] ?? '-', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-                                    ]),
-                                  ]),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
     );
   }
 
-  Widget _emptyView() => ListView(children: [
-    SizedBox(
-      height: MediaQuery.of(context).size.height * 0.6,
-      child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.build_circle_outlined, size: 56, color: AppTheme.border),
-        SizedBox(height: 16),
-        Text('Aucune demande d\'intervention.\nAppuyez sur + pour en créer une.',
-          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.6),
-          textAlign: TextAlign.center),
-      ]),
-    ),
-  ]);
+  Widget _carte(Map<String, dynamic> d) {
+    final p = priorite(d['priorite'] as String?);
+    final (_, couleurPrio) = couleursTon(p.ton);
+    final v = d['vehicule'] as Map<String, dynamic>?;
+    final declarant = d['declarant'] as Map<String, dynamic>?;
 
-  Widget _statutBadge(String statut) {
-    final (bg, fg, label) = switch (statut) {
-      'EN_ATTENTE'      => (const Color(0xFFFFF7ED), AppTheme.warning, 'En attente'),
-      'PRISE_EN_CHARGE' => (AppTheme.primaryLight, AppTheme.primary, 'Prise en charge'),
-      'TRAITEE'         => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Traitée'),
-      'REJETEE'         => (const Color(0xFFFEF2F2), AppTheme.danger, 'Rejetée'),
-      _                 => (const Color(0xFFF3F4F6), AppTheme.textSecondary, statut),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: fg)),
+    return Carte(
+      bordureGauche: couleurPrio,
+      onTap: () => _ouvrir(DiDetailScreen(di: d)),
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  v?['immatriculation'] ?? 'Véhicule inconnu',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                ),
+              ),
+              Pastille(diStatut(d['statut'] as String?)),
+            ],
+          ),
+          if (v != null)
+            Text(
+              '${v['marque'] ?? ''} ${v['modele'] ?? ''}',
+              style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+            ),
+          const SizedBox(height: 8),
+          Text(
+            d['description'] ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13.5, color: AppTheme.textPrimary, height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(p.icone, size: 15, color: couleurPrio),
+              const SizedBox(width: 2),
+              Text(
+                p.texte,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: couleurPrio),
+              ),
+              const SizedBox(width: 12),
+              if (declarant != null) ...[
+                const Icon(Icons.person_outline_rounded, size: 14, color: AppTheme.textSecondary),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(
+                    '${declarant['prenom'] ?? ''} ${declarant['nom'] ?? ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ),
+              ] else
+                const Spacer(),
+              const SizedBox(width: 8),
+              Text(
+                ilYA(d['dateSignalement'] ?? d['createdAt']),
+                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

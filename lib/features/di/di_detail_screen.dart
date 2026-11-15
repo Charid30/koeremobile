@@ -1,8 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/api_service.dart';
 import '../../core/constants/app_theme.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/constants/libelles.dart';
+import '../../core/constants/permissions.dart';
+import '../../core/services/auth_provider.dart';
+import '../../core/utils/format.dart';
 import '../../core/widgets/error_view.dart';
+import '../../core/widgets/ui.dart';
 
 class DiDetailScreen extends StatefulWidget {
   final Map<String, dynamic> di;
@@ -28,9 +36,15 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
     setState(() => _loading = true);
     try {
       final res = await _api.get('/demandes-intervention/${widget.di['id']}');
-      setState(() { _detail = res.data as Map<String, dynamic>; _loading = false; });
+      setState(() {
+        _detail = res.data as Map<String, dynamic>;
+        _loading = false;
+      });
     } catch (_) {
-      setState(() { _detail = widget.di; _loading = false; });
+      setState(() {
+        _detail = widget.di;
+        _loading = false;
+      });
     }
   }
 
@@ -66,7 +80,10 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
     if (ok != true || !mounted) return;
     try {
       await _api.delete('/demandes-intervention/${widget.di['id']}');
-      if (mounted) { Navigator.pop(context, true); showSuccessSnack(context, 'Demande supprimée'); }
+      if (mounted) {
+        Navigator.pop(context, true);
+        showSuccessSnack(context, 'Demande supprimée');
+      }
     } catch (e) {
       if (mounted) showErrorSnack(context, e);
     }
@@ -74,8 +91,8 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
 
   Future<void> _editer() async {
     final d = _detail ?? widget.di;
-    final descCtrl  = TextEditingController(text: d['description'] as String? ?? '');
-    final locCtrl   = TextEditingController(text: d['localisation'] as String? ?? '');
+    final descCtrl = TextEditingController(text: d['description'] as String? ?? '');
+    final locCtrl = TextEditingController(text: d['localisation'] as String? ?? '');
     String priorite = d['priorite'] as String? ?? 'NORMALE';
 
     final saved = await showModalBottomSheet<bool>(
@@ -84,74 +101,86 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setLocal) {
-          final bottom = MediaQuery.of(ctx).viewInsets.bottom;
-          return Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, bottom + 16),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 16),
-              const Text('Modifier la demande', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
-
-              // Description
-              const Text('Description', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: descCtrl,
-                maxLines: 3,
-                decoration: _inputDecor('Décrivez le problème...'),
-              ),
-              const SizedBox(height: 14),
-
-              // Localisation
-              const Text('Localisation', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
-              const SizedBox(height: 6),
-              TextField(controller: locCtrl, decoration: _inputDecor('Rue, quartier, ville...')),
-              const SizedBox(height: 14),
-
-              // Priorité
-              const Text('Priorité', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, children: [
-                for (final p in ['FAIBLE', 'NORMALE', 'URGENTE', 'CRITIQUE'])
-                  ChoiceChip(
-                    label: Text(p, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                        color: priorite == p ? Colors.white : AppTheme.textSecondary)),
-                    selected: priorite == p,
-                    selectedColor: p == 'CRITIQUE' ? AppTheme.danger : p == 'URGENTE' ? AppTheme.warning : AppTheme.primary,
-                    backgroundColor: const Color(0xFFF3F4F6),
-                    onSelected: (_) => setLocal(() => priorite = p),
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+            return Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, bottom + 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(color: AppTheme.border, borderRadius: BorderRadius.circular(2)),
+                    ),
                   ),
-              ]),
-              const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  const Text('Modifier la demande', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 16),
 
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      await _api.patch('/demandes-intervention/${widget.di['id']}', data: {
-                        if (descCtrl.text.trim().isNotEmpty) 'description': descCtrl.text.trim(),
-                        if (locCtrl.text.trim().isNotEmpty) 'localisation': locCtrl.text.trim(),
-                        'priorite': priorite,
-                      });
-                      if (ctx.mounted) Navigator.pop(ctx, true);
-                    } catch (e) {
-                      if (ctx.mounted) showErrorSnack(ctx, e);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary, foregroundColor: Colors.white,
-                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  // Description
+                  const Text(
+                    'Description',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
                   ),
-                  child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
+                  const SizedBox(height: 6),
+                  TextField(controller: descCtrl, maxLines: 3, decoration: _inputDecor('Décrivez le problème...')),
+                  const SizedBox(height: 14),
+
+                  // Localisation
+                  const Text(
+                    'Localisation',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(controller: locCtrl, decoration: _inputDecor('Rue, quartier, ville...')),
+                  const SizedBox(height: 14),
+
+                  // Priorité
+                  const Text(
+                    'Priorité',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  ChoixPriorite(valeur: priorite, onChanged: (p) => setLocal(() => priorite = p)),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          await _api.patch(
+                            '/demandes-intervention/${widget.di['id']}',
+                            data: {
+                              if (descCtrl.text.trim().isNotEmpty) 'description': descCtrl.text.trim(),
+                              if (locCtrl.text.trim().isNotEmpty) 'localisation': locCtrl.text.trim(),
+                              'priorite': priorite,
+                            },
+                          );
+                          if (ctx.mounted) Navigator.pop(ctx, true);
+                        } catch (e) {
+                          if (ctx.mounted) showErrorSnack(ctx, e);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Enregistrer', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          );
-        });
+            );
+          },
+        );
       },
     );
     descCtrl.dispose();
@@ -162,89 +191,231 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
     }
   }
 
+  void _voirPhoto(String url) => showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      insetPadding: const EdgeInsets.all(12),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InteractiveViewer(
+        child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    final role = context.watch<AuthProvider>().user?['role'] as String?;
     final d = _detail ?? widget.di;
     final statut = d['statut'] as String? ?? '';
+    final p = priorite(d['priorite'] as String?);
+    final v = d['vehicule'] as Map<String, dynamic>?;
+    final declarant = d['declarant'] as Map<String, dynamic>?;
+    final photos = (d['photos'] as List?) ?? [];
+    final ots = (d['ordresTravail'] as List?) ?? [];
+    final ouverte = statut != 'TRAITEE' && statut != 'REJETEE';
+    final peutTraiter = autorise(role, 'di.traiter');
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Demande d\'intervention'),
+        title: Text(d['numeroDI'] ?? 'Signalement'),
         actions: [
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: _editer, tooltip: 'Modifier'),
-          IconButton(icon: const Icon(Icons.delete_outline, color: AppTheme.danger), onPressed: _supprimer, tooltip: 'Supprimer'),
-          IconButton(icon: const Icon(Icons.refresh_outlined), onPressed: _charger),
+          if (peutTraiter || autorise(role, 'di.supprimer'))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (a) {
+                if (a == 'modifier') _editer();
+                if (a == 'supprimer') _supprimer();
+              },
+              itemBuilder: (_) => [
+                if (peutTraiter)
+                  const PopupMenuItem(
+                    value: 'modifier',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Modifier'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                if (autorise(role, 'di.supprimer'))
+                  const PopupMenuItem(
+                    value: 'supprimer',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline, color: AppTheme.danger),
+                      title: Text('Supprimer', style: TextStyle(color: AppTheme.danger)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-
-                // ── En-tête ──────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border)),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(
-                        child: Text(
-                          d['vehicule']?['immatriculation'] ?? '-',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                        ),
+      bottomNavigationBar: ouverte && peutTraiter && !_loading
+          ? SafeArea(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: AppTheme.border)),
+                ),
+                child: _actionLoading
+                    ? const SizedBox(height: 48, child: Center(child: CircularProgressIndicator()))
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _changerStatut('REJETEE'),
+                              style: OutlinedButton.styleFrom(foregroundColor: AppTheme.danger),
+                              child: const Text('Rejeter'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: statut == 'EN_ATTENTE'
+                                ? FilledButton.icon(
+                                    onPressed: () => _changerStatut('PRISE_EN_CHARGE'),
+                                    icon: const Icon(Icons.handyman_rounded, size: 18),
+                                    label: const Text('Prendre en charge'),
+                                  )
+                                : FilledButton.icon(
+                                    onPressed: () => _changerStatut('TRAITEE'),
+                                    style: FilledButton.styleFrom(backgroundColor: AppTheme.success),
+                                    icon: const Icon(Icons.check_rounded, size: 18),
+                                    label: const Text('Marquer traitée'),
+                                  ),
+                          ),
+                        ],
                       ),
-                      _statutBadge(statut),
-                    ]),
-                    Text('${d['vehicule']?['marque']} ${d['vehicule']?['modele']}', style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 12),
-                    _prioriteBadge(d['priorite'] as String? ?? 'NORMALE'),
-                  ]),
-                ),
-                const SizedBox(height: 12),
+              ),
+            )
+          : null,
+      body: _loading
+          ? const ChargementListe(lignes: 3)
+          : RefreshIndicator(
+              onRefresh: _charger,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  // ── En-tête ──
+                  Carte(
+                    bordureGauche: couleursTon(p.ton).$2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Pastille(diStatut(statut), icone: true, grande: true),
+                            Pastille(
+                              Libelle('Priorité ${p.texte.toLowerCase()}', p.ton, p.icone),
+                              icone: true,
+                              grande: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          d['description'] ?? '—',
+                          style: const TextStyle(fontSize: 15.5, height: 1.5, color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Signalé ${ilYA(d['dateSignalement'] ?? d['createdAt'])}'
+                          '${declarant != null ? ' par ${declarant['prenom'] ?? ''} ${declarant['nom'] ?? ''}' : ''}',
+                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                // ── Description ──────────────────────────────────────
-                _card('Description', d['description'] ?? '-'),
-                const SizedBox(height: 12),
+                  // ── Photos ──
+                  if (photos.isNotEmpty) ...[
+                    TitreSection('Photos (${photos.length})'),
+                    SizedBox(
+                      height: 96,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, i) {
+                          final url = AppConstants.urlFichier((photos[i] as Map)['url'] as String?);
+                          return GestureDetector(
+                            onTap: () => _voirPhoto(url),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CachedNetworkImage(
+                                imageUrl: url,
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, _, _) => Container(
+                                  width: 96,
+                                  color: AppTheme.primaryLight,
+                                  child: const Icon(Icons.broken_image_outlined, color: AppTheme.primary),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
 
-                // ── Localisation ─────────────────────────────────────
-                if (d['localisation'] != null && (d['localisation'] as String).isNotEmpty) ...[
-                  _localisationCard(d['localisation'] as String),
-                  const SizedBox(height: 12),
-                ],
+                  // ── Lieu ──
+                  if (d['localisation'] != null && (d['localisation'] as String).isNotEmpty) ...[
+                    const TitreSection('Lieu'),
+                    _localisationCard(d['localisation'] as String),
+                  ],
 
-                // ── Infos ────────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border)),
-                  child: Column(children: [
-                    _infoLigne('Demandeur', d['demandeur'] != null ? '${d['demandeur']['prenom']} ${d['demandeur']['nom']}' : '-'),
-                    const Divider(height: 20, color: AppTheme.border),
-                    _infoLigne('Date', _formatDate(d['createdAt'])),
-                    if (d['assigneA'] != null) ...[
-                      const Divider(height: 20, color: AppTheme.border),
-                      _infoLigne('Assigné à', '${d['assigneA']['prenom']} ${d['assigneA']['nom']}'),
+                  // ── Véhicule ──
+                  GroupeInfos(
+                    titre: 'Véhicule',
+                    lignes: [
+                      LigneInfo(Icons.badge_outlined, 'Immatriculation', v?['immatriculation']),
+                      LigneInfo(
+                        Icons.directions_car_outlined,
+                        'Modèle',
+                        v != null ? '${v['marque'] ?? ''} ${v['modele'] ?? ''}' : null,
+                      ),
+                      LigneInfo(Icons.tag_rounded, 'N° interne', v?['numeroInterne']),
                     ],
-                  ]),
-                ),
-                const SizedBox(height: 20),
+                  ),
 
-                // ── Actions de statut ────────────────────────────────
-                if (statut != 'TRAITEE' && statut != 'REJETEE') ...[
-                  const Text('Changer le statut', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                  const SizedBox(height: 8),
-                  if (_actionLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      if (statut == 'EN_ATTENTE')
-                        _actionBtn('PRISE_EN_CHARGE', 'Prendre en charge', AppTheme.primary, Icons.play_circle_outline),
-                      if (statut == 'PRISE_EN_CHARGE')
-                        _actionBtn('TRAITEE', 'Marquer traitée', AppTheme.success, Icons.check_circle_outline),
-                      _actionBtn('REJETEE', 'Rejeter', AppTheme.danger, Icons.cancel_outlined),
-                    ]),
+                  // ── Suite donnée ──
+                  if (ots.isNotEmpty) ...[
+                    const TitreSection('Ordres de travail'),
+                    Carte(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < ots.length; i++) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.build_circle_outlined, size: 20, color: AppTheme.primary),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      (ots[i] as Map)['numeroOT'] ?? 'OT',
+                                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  Pastille(otStatut((ots[i] as Map)['statut'] as String?)),
+                                ],
+                              ),
+                            ),
+                            if (i < ots.length - 1) const Divider(height: 1, indent: 44),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ]),
+              ),
             ),
     );
   }
@@ -270,102 +441,50 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
 
   Widget _localisationCard(String loc) {
     final isGps = _estCoordonnees(loc);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border)),
-      child: Row(children: [
-        const Icon(Icons.location_on_outlined, color: AppTheme.primary, size: 18),
-        const SizedBox(width: 8),
-        Expanded(child: Text(loc, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary))),
-        if (isGps) ...[
+    return Carte(
+      child: Row(
+        children: [
+          const Icon(Icons.location_on_outlined, color: AppTheme.primary, size: 18),
           const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: () => _ouvrirGoogleMaps(loc),
-            icon: const Icon(Icons.map_outlined, size: 16),
-            label: const Text('Maps', style: TextStyle(fontSize: 12)),
-            style: TextButton.styleFrom(
-              foregroundColor: AppTheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              backgroundColor: AppTheme.primaryLight,
-            ),
+          Expanded(
+            child: Text(loc, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
           ),
+          if (isGps) ...[
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () => _ouvrirGoogleMaps(loc),
+              icon: const Icon(Icons.map_outlined, size: 16),
+              label: const Text('Maps', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: AppTheme.primaryLight,
+              ),
+            ),
+          ],
         ],
-      ]),
-    );
-  }
-
-  Widget _card(String titre, String contenu) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(titre.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary, letterSpacing: 0.8)),
-      const SizedBox(height: 8),
-      Text(contenu, style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.5)),
-    ]),
-  );
-
-  Widget _infoLigne(String label, String valeur) => Row(children: [
-    Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-    const Spacer(),
-    Text(valeur, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textPrimary)),
-  ]);
-
-  Widget _actionBtn(String statut, String label, Color color, IconData icon) => OutlinedButton.icon(
-    onPressed: () => _changerStatut(statut),
-    icon: Icon(icon, size: 16),
-    label: Text(label),
-    style: OutlinedButton.styleFrom(
-      foregroundColor: color,
-      side: BorderSide(color: color.withValues(alpha: 0.4)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-  );
-
-  Widget _statutBadge(String statut) {
-    final (bg, fg, label) = switch (statut) {
-      'EN_ATTENTE'      => (const Color(0xFFFFF7ED), AppTheme.warning, 'En attente'),
-      'PRISE_EN_CHARGE' => (AppTheme.primaryLight, AppTheme.primary, 'Prise en charge'),
-      'TRAITEE'         => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Traitée'),
-      'REJETEE'         => (const Color(0xFFFEF2F2), AppTheme.danger, 'Rejetée'),
-      _                 => (const Color(0xFFF3F4F6), AppTheme.textSecondary, statut),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
-    );
-  }
-
-  Widget _prioriteBadge(String p) {
-    final (bg, fg) = switch (p) {
-      'CRITIQUE' => (const Color(0xFFFEF2F2), AppTheme.danger),
-      'URGENTE'  => (const Color(0xFFFFF7ED), AppTheme.warning),
-      'FAIBLE'   => (const Color(0xFFF3F4F6), AppTheme.textSecondary),
-      _          => (AppTheme.primaryLight, AppTheme.primary),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-      child: Text('Priorité $p', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+      ),
     );
   }
 
   InputDecoration _inputDecor(String hint) => InputDecoration(
     hintText: hint,
     hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-    filled: true, fillColor: const Color(0xFFF9FAFB),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
+    filled: true,
+    fillColor: const Color(0xFFF9FAFB),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AppTheme.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AppTheme.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+    ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
   );
-
-  String _formatDate(dynamic val) {
-    if (val == null) return '-';
-    try {
-      final d = DateTime.parse(val.toString()).toLocal();
-      return '${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year} ${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}';
-    } catch (_) { return '-'; }
-  }
 }

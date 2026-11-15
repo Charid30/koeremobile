@@ -9,4 +9,11 @@ class AppConstants {
   static const String tokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String userCacheKey    = 'user_cache';
+
+  /// Adresse complète d'un fichier envoyé (photo…) à partir du chemin renvoyé par l'API.
+  static String urlFichier(String? chemin) {
+    if (chemin == null || chemin.isEmpty) return '';
+    if (chemin.startsWith('http')) return chemin;
+    return baseUrl.replaceFirst(RegExp(r'/api/?$'), '') + chemin;
+  }
 }
