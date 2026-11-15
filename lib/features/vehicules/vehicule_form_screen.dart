@@ -418,9 +418,9 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
+          color: AppTheme.primaryLight,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFBFDBFE)),
+          border: Border.all(color: AppTheme.primaryBorder),
         ),
         child: const Row(children: [
           Icon(Icons.info_outline, color: AppTheme.primary, size: 18),
@@ -457,7 +457,7 @@ class _VehiculeFormScreenState extends State<VehiculeFormScreen> {
         final sel = s == _statut;
         final (color, bg) = switch (s) {
           'DISPONIBLE'                    => (const Color(0xFF15803D), const Color(0xFFDCFCE7)),
-          'EN_CIRCULATION'                => (AppTheme.primary, const Color(0xFFEFF6FF)),
+          'EN_CIRCULATION'                => (AppTheme.primary, AppTheme.primaryLight),
           'EN_MAINTENANCE'                => (AppTheme.warning, const Color(0xFFFFF7ED)),
           'EN_ATTENTE_REPARATION_EXTERNE' => (AppTheme.warning, const Color(0xFFFFF7ED)),
           'EN_ATTENTE_PIECES'             => (AppTheme.warning, const Color(0xFFFFF7ED)),

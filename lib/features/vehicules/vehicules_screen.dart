@@ -98,7 +98,7 @@ class _VehiculesScreenState extends State<VehiculesScreen> {
   Widget _statutBadge(String statut) {
     final (bg, fg, label) = switch (statut) {
       'DISPONIBLE'                    => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Disponible'),
-      'EN_CIRCULATION'                => (const Color(0xFFEFF6FF), AppTheme.primary, 'En circulation'),
+      'EN_CIRCULATION'                => (AppTheme.primaryLight, AppTheme.primary, 'En circulation'),
       'EN_MAINTENANCE'                => (const Color(0xFFFFF7ED), AppTheme.warning, 'Maintenance'),
       'EN_ATTENTE_REPARATION_EXTERNE' => (const Color(0xFFFFF7ED), AppTheme.warning, 'Att. réparation'),
       'EN_ATTENTE_PIECES'             => (const Color(0xFFFFF7ED), AppTheme.warning, 'Att. pièces'),

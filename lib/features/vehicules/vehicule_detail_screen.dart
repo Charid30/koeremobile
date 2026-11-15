@@ -294,7 +294,7 @@ class _VehiculeDetailScreenState extends State<VehiculeDetailScreen> {
   Widget _statutBadge(String statut) {
     final (bg, fg, label) = switch (statut) {
       'DISPONIBLE'                    => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Disponible'),
-      'EN_CIRCULATION'                => (const Color(0xFFEFF6FF), AppTheme.primary, 'En circulation'),
+      'EN_CIRCULATION'                => (AppTheme.primaryLight, AppTheme.primary, 'En circulation'),
       'EN_MAINTENANCE'                => (const Color(0xFFFFF7ED), AppTheme.warning, 'En maintenance'),
       'EN_ATTENTE_REPARATION_EXTERNE' => (const Color(0xFFFFF7ED), AppTheme.warning, 'Att. réparation ext.'),
       'EN_ATTENTE_PIECES'             => (const Color(0xFFFFF7ED), AppTheme.warning, 'Att. pièces'),
@@ -313,7 +313,7 @@ class _VehiculeDetailScreenState extends State<VehiculeDetailScreen> {
   Widget _statutBadgeDI(String statut) {
     final (bg, fg, label) = switch (statut) {
       'EN_ATTENTE' => (const Color(0xFFFFF7ED), AppTheme.warning, 'En attente'),
-      'EN_COURS'   => (const Color(0xFFEFF6FF), AppTheme.primary, 'En cours'),
+      'EN_COURS'   => (AppTheme.primaryLight, AppTheme.primary, 'En cours'),
       'RESOLUE'    => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Résolue'),
       'REJETEE'    => (const Color(0xFFFEF2F2), AppTheme.danger, 'Rejetée'),
       _            => (const Color(0xFFF3F4F6), AppTheme.textSecondary, statut),

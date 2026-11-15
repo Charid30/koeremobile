@@ -40,25 +40,41 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SingleChildScrollView(
         child: Column(children: [
 
-          // ── Bandeau haut avec logo ────────────────────────────────
+          // ── Bandeau haut aux couleurs de la marque ───────────────
           Container(
             width: double.infinity,
             height: size.height * 0.36,
             decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                bottomLeft:  Radius.circular(36),
-                bottomRight: Radius.circular(36),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppTheme.brand, AppTheme.primaryDark],
               ),
-              boxShadow: [BoxShadow(color: Color(0x0D000000), blurRadius: 20, offset: Offset(0, 4))],
+              borderRadius: BorderRadius.only(
+                bottomLeft:  Radius.circular(32),
+                bottomRight: Radius.circular(32),
+              ),
             ),
             child: SafeArea(
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Image.asset('assets/images/logo.png', width: 130, height: 130),
-                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 8))],
+                  ),
+                  child: Image.asset('assets/images/logo.png', width: 96, height: 96),
+                ),
+                const SizedBox(height: 16),
                 const Text(
-                  'Gestion de flotte véhicules',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, letterSpacing: 0.3),
+                  'SOFARY',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 1),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Gestion de maintenance de flotte',
+                  style: TextStyle(fontSize: 13, color: Color(0xCCFFFFFF), letterSpacing: 0.2),
                 ),
               ]),
             ),

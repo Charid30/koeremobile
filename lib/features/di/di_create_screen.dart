@@ -196,7 +196,7 @@ class _DiCreateScreenState extends State<DiCreateScreen> {
                 child: ElevatedButton(
                   onPressed: _geoLoading ? null : _geoLocaliser,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEFF6FF),
+                    backgroundColor: AppTheme.primaryLight,
                     foregroundColor: AppTheme.primary,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 12),

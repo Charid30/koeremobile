@@ -325,7 +325,7 @@ class _DiDetailScreenState extends State<DiDetailScreen> {
   Widget _statutBadge(String statut) {
     final (bg, fg, label) = switch (statut) {
       'EN_ATTENTE'      => (const Color(0xFFFFF7ED), AppTheme.warning, 'En attente'),
-      'PRISE_EN_CHARGE' => (const Color(0xFFEFF6FF), AppTheme.primary, 'Prise en charge'),
+      'PRISE_EN_CHARGE' => (AppTheme.primaryLight, AppTheme.primary, 'Prise en charge'),
       'TRAITEE'         => (const Color(0xFFDCFCE7), const Color(0xFF15803D), 'Traitée'),
       'REJETEE'         => (const Color(0xFFFEF2F2), AppTheme.danger, 'Rejetée'),
       _                 => (const Color(0xFFF3F4F6), AppTheme.textSecondary, statut),
