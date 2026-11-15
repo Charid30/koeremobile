@@ -9,8 +9,8 @@ class ApiService {
   late final Dio _dio;
   final _storage = const FlutterSecureStorage();
 
-  // Guard pour éviter de lancer plusieurs refreshs simultanément
-  bool _refreshing = false;
+  // Renouvellement en cours : les requêtes qui reçoivent un 401 en même temps l'attendent
+  Future<_RefreshResult>? _refreshEnCours;
 
   ApiService() {
     _dio = Dio(BaseOptions(
@@ -29,24 +29,35 @@ class ApiService {
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401 && !_refreshing) {
-          final result = await _refreshToken();
+        final opts = error.requestOptions;
+        final dejaRejouee = opts.extra['rejouee'] == true;
+        if (error.response?.statusCode == 401 && !dejaRejouee && !opts.path.contains('/auth/login') && !opts.path.contains('/auth/refresh')) {
+          final envoye = opts.headers['Authorization'] as String?;
+          final actuel = await _storage.read(key: AppConstants.tokenKey);
+
+          // Jeton déjà renouvelé par une autre requête : on rejoue simplement
+          var result = _RefreshResult.success;
+          if (actuel == null || envoye == 'Bearer $actuel') {
+            result = await (_refreshEnCours ??= _refreshToken().whenComplete(() => _refreshEnCours = null));
+          }
 
           if (result == _RefreshResult.success) {
-            // Retry de la requête originale avec le nouveau token
             final token = await _storage.read(key: AppConstants.tokenKey);
-            error.requestOptions.headers['Authorization'] = 'Bearer $token';
+            opts.headers['Authorization'] = 'Bearer $token';
+            opts.extra['rejouee'] = true;
             try {
-              final retry = await _dio.fetch(error.requestOptions);
+              final retry = await _dio.fetch(opts);
               return handler.resolve(retry);
-            } catch (_) {}
+            } on DioException catch (e) {
+              return handler.next(e);
+            }
           } else if (result == _RefreshResult.authFailed) {
-            // Token refresh explicitement refusé par le serveur → déconnexion
+            // Renouvellement explicitement refusé par le serveur → déconnexion
             await _storage.deleteAll();
             navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (_) => false);
           }
-          // _RefreshResult.networkError → on laisse passer l'erreur 401
-          // sans supprimer les tokens (l'utilisateur reste connecté)
+          // _RefreshResult.networkError → on laisse passer l'erreur
+          // sans supprimer les jetons (l'utilisateur reste connecté)
         }
         handler.next(error);
       },
@@ -54,33 +65,31 @@ class ApiService {
   }
 
   Future<_RefreshResult> _refreshToken() async {
-    _refreshing = true;
     try {
       final refresh = await _storage.read(key: AppConstants.refreshTokenKey);
-      if (refresh == null) {
-        _refreshing = false;
-        return _RefreshResult.authFailed;
-      }
+      if (refresh == null) return _RefreshResult.authFailed;
       final res = await Dio().post(
         '${AppConstants.baseUrl}/auth/refresh',
-        data: {'refreshToken': refresh},
         options: Options(
-          sendTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
+          headers: {'Authorization': 'Bearer $refresh'},
+          sendTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
         ),
       );
       await _storage.write(key: AppConstants.tokenKey, value: res.data['accessToken']);
-      _refreshing = false;
+      // Le serveur fait tourner le refresh token : il faut garder le nouveau
+      final nouveauRefresh = res.data['refreshToken'];
+      if (nouveauRefresh is String && nouveauRefresh.isNotEmpty) {
+        await _storage.write(key: AppConstants.refreshTokenKey, value: nouveauRefresh);
+      }
       return _RefreshResult.success;
     } on DioException catch (e) {
-      _refreshing = false;
-      // 401/403 du serveur = token vraiment invalide
+      // 401/403 du serveur = session vraiment invalide
       final code = e.response?.statusCode ?? 0;
       if (code == 401 || code == 403) return _RefreshResult.authFailed;
-      // Erreur réseau / timeout = ne pas déconnecter
+      // Erreur réseau / timeout / serveur indisponible = ne pas déconnecter
       return _RefreshResult.networkError;
     } catch (_) {
-      _refreshing = false;
       return _RefreshResult.networkError;
     }
   }

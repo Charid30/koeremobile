@@ -41,7 +41,7 @@ class AuthService {
   // Rafraîchit le profil depuis l'API et met à jour le cache
   Future<Map<String, dynamic>?> getProfile() async {
     try {
-      final res = await _api.get('/auth/me');
+      final res = await _api.get('/auth/profil');
       final user = res.data as Map<String, dynamic>;
       await _storage.write(key: AppConstants.userCacheKey, value: jsonEncode(user));
       return user;
